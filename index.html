@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saint John Daily Readings</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:"Source Sans 3",sans-serif;
+  background:transparent;
+  color:#1a1814;
+}
+.sj-rd-wrap{
+  background:#f0ebe0;
+  border:2px solid rgba(30,58,95,0.30);
+  border-radius:12px;
+  padding:14px 18px;
+  max-width:480px;
+  margin:0 auto;
+  text-align:center;
+}
+.sj-rd-date{
+  font-family:"Source Sans 3",sans-serif;
+  font-size:13px;
+  font-weight:600;
+  color:#5a5248;
+  letter-spacing:1px;
+  margin-bottom:6px;
+}
+.sj-rd-label{
+  font-size:14px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:#1e3a5f;
+  margin-bottom:8px;
+  font-weight:700;
+}
+.sj-rd-entry{
+  margin-bottom:10px;
+}
+.sj-rd-entry:last-child{
+  margin-bottom:6px;
+}
+.sj-rd-title{
+  font-family:"Playfair Display",Georgia,serif;
+  font-size:15px;
+  font-weight:600;
+  color:#1a1814;
+  line-height:1.4;
+  margin-bottom:2px;
+}
+.sj-rd-lect{
+  font-size:13px;
+  font-weight:600;
+  color:#b5800a;
+}
+.sj-rd-divider{
+  height:1px;
+  background:linear-gradient(to right,transparent,#b5800a,transparent);
+  margin:8px 0;
+}
+.sj-rd-link{
+  display:inline-block;
+  background:rgba(30,48,85,0.12);
+  border:1px solid rgba(30,48,85,0.35);
+  color:#1e3a5f;
+  font-size:13px;
+  font-weight:700;
+  padding:5px 14px;
+  border-radius:999px;
+  text-decoration:none;
+  transition:background 0.2s,color 0.2s;
+  margin-top:4px;
+}
+.sj-rd-link:hover{
+  background:rgba(181,128,10,0.4);
+  color:#ffffff;
+}
+.sj-rd-loading{
+  font-size:13px;
+  color:#5a5248;
+  font-style:italic;
+  padding:6px 0;
+}
+.sj-rd-error{
+  font-size:13px;
+  color:#5a5248;
+}
+</style>
+</head>
+<body>
+<div class="sj-rd-wrap">
+  <div class="sj-rd-label" id="rdLabel">Today's Mass Readings</div>
+  <div class="sj-rd-date" id="rdDate"></div>
+  <div id="rdContent"><div class="sj-rd-loading"><i class="fas fa-spinner fa-spin"></i> Loading today's readings...</div></div>
+  <a id="rdLink" class="sj-rd-link" href="https://bible.usccb.org/daily-bible-reading" target="_blank">View Full Readings</a>
+</div>
+<script>
+(function(){
+  // Get today's date
+  const now = new Date();
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+  // Display formatted date
+  const dateStr = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear();
+  document.getElementById('rdDate').textContent = dateStr;
+
+  // Build USCCB URL: MMDDYY format
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const dd = String(now.getDate()).padStart(2,'0');
+  const yy = String(now.getFullYear()).slice(-2);
+  const usccbDate = mm + dd + yy;
+  const usccbUrl = 'https://bible.usccb.org/bible/readings/' + usccbDate + '.cfm';
+
+  // Update the "View Full Readings" link
+  document.getElementById('rdLink').href = usccbUrl;
+
+  // Fetch via CORS proxy
+  const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(usccbUrl);
+
+  fetch(proxyUrl)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data || !data.contents){
+        throw new Error('No content');
+      }
+      parseReadings(data.contents);
+    })
+    .catch(function(){
+      // Fallback: show date and direct link
+      document.getElementById('rdContent').innerHTML =
+        '<div class="sj-rd-error">Readings available at USCCB.org</div>';
+    });
+
+  function parseReadings(html){
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(html, 'text/html');
+    var content = document.getElementById('rdContent');
+    content.innerHTML = '';
+
+    // Find all h2 elements in the main content area
+    var headings = doc.querySelectorAll('h2');
+    var entries = [];
+
+    headings.forEach(function(h2){
+      var title = h2.textContent.trim();
+      // Skip navigation/menu h2s — only want reading titles
+      if(!title || title.length < 5) return;
+      if(title.match(/^menu/i) || title.match(/^main nav/i)) return;
+      if(title.match(/subscribe/i) || title.match(/footer/i)) return;
+
+      // Look for "Lectionary: ###" after this h2
+      var lectionary = '';
+      var next = h2.nextElementSibling;
+      // Search up to 5 siblings for lectionary text
+      for(var i=0; i<5 && next; i++){
+        var text = next.textContent || '';
+        var match = text.match(/Lectionary:\s*(\d+)/);
+        if(match){
+          lectionary = match[1];
+          break;
+        }
+        next = next.nextElementSibling;
+      }
+
+      if(lectionary){
+        entries.push({title: title, lectionary: lectionary});
+      }
+    });
+
+    if(entries.length === 0){
+      // Fallback: try page title
+      var pageTitle = doc.querySelector('title');
+      if(pageTitle){
+        var t = pageTitle.textContent.replace(' | USCCB','').trim();
+        // Try to find any lectionary text on page
+        var bodyText = doc.body ? doc.body.textContent : '';
+        var lMatch = bodyText.match(/Lectionary:\s*(\d+)/);
+        entries.push({
+          title: t,
+          lectionary: lMatch ? lMatch[1] : ''
+        });
+      }
+    }
+
+    if(entries.length === 0){
+      content.innerHTML = '<div class="sj-rd-error">Readings available at USCCB.org</div>';
+      return;
+    }
+
+    entries.forEach(function(entry, idx){
+      if(idx > 0){
+        var div = document.createElement('div');
+        div.className = 'sj-rd-divider';
+        content.appendChild(div);
+      }
+      var entryDiv = document.createElement('div');
+      entryDiv.className = 'sj-rd-entry';
+
+      var titleDiv = document.createElement('div');
+      titleDiv.className = 'sj-rd-title';
+      titleDiv.textContent = entry.title;
+      entryDiv.appendChild(titleDiv);
+
+      if(entry.lectionary){
+        var lectDiv = document.createElement('div');
+        lectDiv.className = 'sj-rd-lect';
+        lectDiv.textContent = 'Lectionary: ' + entry.lectionary;
+        entryDiv.appendChild(lectDiv);
+      }
+
+      content.appendChild(entryDiv);
+    });
+  }
+
+  // Bilingual: check if parent page is in Spanish mode
+  // The iframe URL will have ?lang=es appended when in Spanish mode
+  var urlParams = new URLSearchParams(window.location.search);
+  if(urlParams.get('lang') === 'es'){
+    document.getElementById('rdLabel').textContent = 'Lecturas de Misa de Hoy';
+    var link = document.getElementById('rdLink');
+    link.textContent = 'Ver Lecturas Completas';
+    // Switch to Spanish USCCB page
+    link.href = 'https://bible.usccb.org/es/bible/lecturas/' + usccbDate + '.cfm';
+  }
+})();
+</script>
+</body>
+</html>

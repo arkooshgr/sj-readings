@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Redirecting to Today's Readings...</title>
+<style>
+body{font-family:"Source Sans 3",Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#faf8f3;color:#1a1814;}
+.msg{text-align:center;padding:20px;}
+.msg i{color:#b5800a;font-size:24px;margin-bottom:10px;display:block;}
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script>
+(function(){
+  var now = new Date();
+  var day = now.getDay();
+  var hour = now.getHours();
+  var target = new Date(now);
+
+  // Saturday (day 6) after 2 PM (14:00) -> show Sunday readings
+  if(day === 6 && hour >= 14){
+    target.setDate(target.getDate() + 1);
+  }
+
+  var mm = String(target.getMonth()+1).padStart(2,'0');
+  var dd = String(target.getDate()).padStart(2,'0');
+  var yy = String(target.getFullYear()).slice(-2);
+
+  // Check for Spanish mode
+  var params = new URLSearchParams(window.location.search);
+  var lang = params.get('lang');
+
+  var url;
+  if(lang === 'es'){
+    url = 'https://bible.usccb.org/es/bible/lecturas/' + mm + dd + yy + '.cfm';
+  } else {
+    url = 'https://bible.usccb.org/bible/readings/' + mm + dd + yy + '.cfm';
+  }
+
+  window.location.replace(url);
+})();
+</script>
+</head>
+<body>
+<div class="msg">
+  <i class="fas fa-book-open"></i>
+  <p>Loading today's readings...</p>
+</div>
+</body>
+</html>
